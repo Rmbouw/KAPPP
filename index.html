@@ -1,38 +1,152 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FILE TUGAS AGUS SALEH RUMBOUW</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FILE TUGAS AGUS SALEH RUMBOUW</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial, sans-serif;
+    background:#f1f3f4;
+}
+header{
+    background:#1a73e8;
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-weight:bold;
+}
+.box{
+    background:white;
+    margin:20px;
+    padding:20px;
+    border-radius:10px;
+}
+button{
+    background:#1a73e8;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:6px;
+}
+input{
+    width:100%;
+    padding:10px;
+    margin:10px 0;
+}
+.file{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid #ddd;
+    padding:10px 0;
+}
+img, video{
+    max-width:100%;
+    height:auto;
+}
+iframe{
+    width:100%;
+    height:80vh;
+    border:none;
+}
+</style>
 </head>
+
 <body>
-    <div class="container">
-        <div id="main-page" class="main-page">
-            <h1 class="title">FILE TUGAS AGUS SALEH RUMBOUW</h1>
-            <div class="login-box">
-                <button id="login-btn" class="login-btn">Masuk</button>
-            </div>
-        </div>
 
-        <div id="file-manager" class="file-manager">
-            <h2>File Tugas</h2>
-            <div class="upload-section">
-                <input type="file" id="file-input" accept=".pdf,image/*,video/*" multiple style="display: none;">
-                <button id="upload-btn" class="upload-btn">Upload File</button>
-            </div>
-            <ul id="file-list" class="file-list"></ul>
-        </div>
+<header>FILE TUGAS</header>
 
-        <div id="file-viewer" class="file-viewer">
-            <div id="file-content"></div>
-            <div class="viewer-actions">
-                <button id="back-btn" class="back-btn">Kembali</button>
-                <button id="download-btn" class="download-btn">Download</button>
-            </div>
-        </div>
-    </div>
+<!-- LOGIN -->
+<div id="login" class="box">
+    <button onclick="masuk()">Masuk</button>
+</div>
 
-    <script src="script.js"></script>
+<!-- DRIVE -->
+<div id="drive" class="box" style="display:none">
+    <input type="file" id="fileInput" accept="application/pdf,image/*,video/*">
+    <button onclick="upload()">Upload</button>
+    <div id="list"></div>
+</div>
+
+<!-- VIEW -->
+<div id="view" class="box" style="display:none">
+    <button onclick="kembali()">⬅ Kembali</button>
+    <button onclick="download()">⬇ Download</button>
+    <div id="preview"></div>
+</div>
+
+<script>
+let files = [];
+let current = null;
+
+function masuk(){
+    document.getElementById("login").style.display="none";
+    document.getElementById("drive").style.display="block";
+}
+
+function upload(){
+    let f = document.getElementById("fileInput").files[0];
+    if(!f) return;
+
+    let r = new FileReader();
+    r.onload = e=>{
+        files.push({name:f.name,type:f.type,data:e.target.result});
+        tampil();
+    };
+    r.readAsDataURL(f);
+}
+
+function tampil(){
+    let l = document.getElementById("list");
+    l.innerHTML="";
+    files.forEach((f,i)=>{
+        l.innerHTML+=`
+        <div class="file">
+            ${f.name}
+            <div>
+                <button onclick="lihat(${i})">Lihat</button>
+                <button onclick="hapus(${i})">Hapus</button>
+            </div>
+        </div>`;
+    });
+}
+
+function lihat(i){
+    current = files[i];
+    document.getElementById("drive").style.display="none";
+    document.getElementById("view").style.display="block";
+
+    let p = document.getElementById("preview");
+    p.innerHTML="";
+
+    if(current.type.includes("pdf"))
+        p.innerHTML=`<iframe src="${current.data}"></iframe>`;
+    else if(current.type.includes("image"))
+        p.innerHTML=`<img src="${current.data}">`;
+    else
+        p.innerHTML=`<video src="${current.data}" controls></video>`;
+}
+
+function kembali(){
+    document.getElementById("view").style.display="none";
+    document.getElementById("drive").style.display="block";
+}
+
+function download(){
+    let a = document.createElement("a");
+    a.href=current.data;
+    a.download=current.name;
+    a.click();
+}
+
+function hapus(i){
+    files.splice(i,1);
+    tampil();
+}
+</script>
+
 </body>
 </html>
