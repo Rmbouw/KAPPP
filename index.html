@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FILE TUGAS AGUS SALEH RUMBOUW</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="main-page" class="main-page">
+            <h1 class="title">FILE TUGAS AGUS SALEH RUMBOUW</h1>
+            <div class="login-box">
+                <button id="login-btn" class="login-btn">Masuk</button>
+            </div>
+        </div>
+
+        <div id="file-manager" class="file-manager">
+            <h2>File Tugas</h2>
+            <div class="upload-section">
+                <input type="file" id="file-input" accept=".pdf,image/*,video/*" multiple style="display: none;">
+                <button id="upload-btn" class="upload-btn">Upload File</button>
+            </div>
+            <ul id="file-list" class="file-list"></ul>
+        </div>
+
+        <div id="file-viewer" class="file-viewer">
+            <div id="file-content"></div>
+            <div class="viewer-actions">
+                <button id="back-btn" class="back-btn">Kembali</button>
+                <button id="download-btn" class="download-btn">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
