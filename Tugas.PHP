@@ -1,32 +1,38 @@
 <?php
-session_start();
-$upload_dir = 'uploads/';
-if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
+// --- LOGIKA BACKEND PHP ---
 
-$current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'pdf';
+// Mengatur batas upload agar bisa sampai 600MB
+ini_set('upload_max_filesize', '600M');
+ini_set('post_max_size', '600M');
+ini_set('memory_limit', '1024M');
 
-if (isset($_GET['action']) && $_GET['action'] == 'logout') {
-    session_destroy();
-    header("Location: " . $_SERVER['PHP_SELF']);
+$uploadDir = 'uploads/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0777, true);
+}
+
+// Logika Hapus File
+if (isset($_GET['hapus'])) {
+    $fileHapus = basename($_GET['hapus']);
+    if (file_exists($uploadDir . $fileHapus)) {
+        unlink($uploadDir . $fileHapus);
+    }
+    header("Location: " . $_SERVER['PHP_SELF'] . "?page=dashboard");
     exit;
 }
 
-if (isset($_FILES['tugas_file'])) {
-    $target_tab = $_POST['active_tab'];
-    $file_name = $_FILES['tugas_file']['name'];
-    $target_file = $upload_dir . time() . '_' . $file_name;
-    if(move_uploaded_file($_FILES['tugas_file']['tmp_name'], $target_file)) {
-        header("Location: " . $_SERVER['PHP_SELF'] . "?page=upload&tab=" . $target_tab);
+// Logika Upload File
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['tugas'])) {
+    $fileName = basename($_FILES['tugas']['name']);
+    $targetPath = $uploadDir . $fileName;
+    if (move_uploaded_file($_FILES['tugas']['tmp_name'], $targetPath)) {
+        header("Location: " . $_SERVER['PHP_SELF'] . "?page=dashboard");
         exit;
     }
 }
 
-if (isset($_GET['delete'])) {
-    $target_tab = isset($_GET['tab']) ? $_GET['tab'] : 'pdf';
-    if (file_exists($_GET['delete'])) { unlink($_GET['delete']); }
-    header("Location: " . $_SERVER['PHP_SELF'] . "?page=upload&tab=" . $target_tab);
-    exit;
-}
+// Menentukan halaman yang sedang dibuka
+$page = isset($_GET['page']) ? $_GET['page'] : 'home';
 ?>
 
 <!DOCTYPE html>
@@ -34,187 +40,217 @@ if (isset($_GET['delete'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem File Tugas</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Sistem Manajemen Tugas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <style>
-        :root { --primary: #2563eb; --danger: #dc2626; --bg: #f1f5f9; --gray: #6b7280; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; padding: 0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-
-        #progress-bar-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 5px; background: #e2e8f0; z-index: 10000; }
-        #progress-bar { width: 0%; height: 100%; background: var(--gray); transition: width 0.1s linear; }
-
-        .container { width: 95%; max-width: 900px; background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; margin: 20px auto; }
+        /* --- CSS STYLE --- */
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
         
-        .tab-header { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
-        .tab-btn { padding: 12px 20px; border: none; background: #e2e8f0; cursor: pointer; border-radius: 8px; font-weight: 600; color: #475569; transition: 0.3s; font-size: 14px; flex: 1; }
-        .tab-btn.active { background: var(--primary); color: white; }
-        .tab-content { display: none; animation: fadeIn 0.3s ease; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .file-list { text-align: left; margin-top: 15px; border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
-        .file-item { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #fff; }
-        .file-info { display: flex; flex-direction: column; max-width: 65%; }
-        .file-name { font-weight: 600; font-size: 14px; color: #1e293b; word-break: break-all; }
-        .file-meta { font-size: 11px; color: #94a3b8; }
-
-        .preview-wrapper { 
-            width: 100%; 
-            background: #1a1a1a; 
-            border-radius: 10px; 
-            overflow: hidden; 
+        body { 
+            background: #f0f2f5; 
             display: flex; 
             justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            color: #333;
+        }
+
+        /* Loading Overlay */
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            margin-top: 15px;
         }
-        .preview-wrapper img, .preview-wrapper video { 
-            max-width: 100%; 
-            height: auto; 
-            display: block;
-            object-fit: contain; 
+
+        /* Card Container */
+        .card {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
         }
-        .preview-wrapper iframe { width: 100%; height: 600px; border: none; }
 
-        .upload-box { margin-bottom: 20px; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; background: #fafafa; }
-        .btn-upload { color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
-        
-        .logout-btn { color: var(--danger); text-decoration: none; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        /* Halaman Pertama */
+        .landing-box { padding: 40px 20px; }
+        .title-box { 
+            font-size: 24px; 
+            font-weight: bold; 
+            letter-spacing: 2px; 
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .btn-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-link:hover { color: #2980b9; }
 
-        @media (max-width: 600px) {
-            .tab-btn { font-size: 12px; padding: 10px 5px; }
-            .preview-wrapper iframe { height: 400px; }
+        /* Halaman Kedua (Dashboard) */
+        .header-dash {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .logout { color: #e74c3c; text-decoration: none; font-size: 14px; font-weight: bold; }
+
+        /* List File Tanpa Kotak */
+        .file-list { width: 100%; text-align: left; margin-bottom: 30px; }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f9f9f9;
+        }
+        .file-name { font-size: 14px; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+        .actions a {
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 10px;
+            color: #7f8c8d;
+        }
+        .actions a:hover { color: #2c3e50; }
+
+        /* Bagian Upload (Dengan Kotak) */
+        .upload-area {
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px dashed #dcdde1;
+            border-radius: 15px;
+            background: #fbfbfb;
+        }
+        input[type="file"] { margin-bottom: 15px; width: 100%; }
+        .btn-upload {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+
+        /* View Mode */
+        .preview-box { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+        .preview-content { max-width: 100%; height: auto; border-radius: 10px; }
+
+        /* Responsive HP */
+        @media (max-width: 480px) {
+            .card { padding: 20px; width: 95%; }
+            .file-name { max-width: 50%; }
         }
     </style>
 </head>
 <body>
 
-    <div id="progress-bar-container"><div id="progress-bar"></div></div>
+    <div id="loader">
+        <i class="fas fa-circle-notch fa-spin fa-3x" style="color: #3498db;"></i>
+        <p style="margin-top: 15px; color: #7f8c8d;">Memproses...</p>
+    </div>
 
-    <?php if (!isset($_GET['page'])): ?>
-        <div class="container">
-            <div style="border:3px solid #333; padding:20px; font-weight:800; font-size:1.5rem; margin-bottom:20px;">FILE TUGAS</div>
-            <a onclick="startLoading()" style="color:var(--primary); font-weight:bold; cursor:pointer; text-decoration:none;">klik sini</a>
+    <?php if ($page == 'home'): ?>
+    <div class="card landing-box">
+        <div class="title-box">FILE TUGAS</div>
+        <a href="javascript:void(0)" class="btn-link" onclick="goToDashboard()">
+            <i class="fas fa-hand-pointer"></i> Klik Sini
+        </a>
+    </div>
+
+    <?php elseif ($page == 'dashboard'): ?>
+    <div class="card">
+        <div class="header-dash">
+            <h3 style="font-size: 18px;">Daftar File</h3>
+            <a href="?page=home" class="logout">
+                <i class="fas fa-power-off"></i> LOGOUT
+            </a>
         </div>
 
-    <?php elseif ($_GET['page'] == 'upload'): ?>
-        <div class="container">
-            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin:0">Manajemen File</h3>
-                <a href="?action=logout" class="logout-btn"><i class="fas fa-right-from-bracket"></i> Logout</a>
-            </div>
-
-            <div class="tab-header">
-                <button class="tab-btn <?php echo ($current_tab == 'pdf') ? 'active' : ''; ?>" onclick="openTab(event, 'tab-pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
-                <button class="tab-btn <?php echo ($current_tab == 'foto') ? 'active' : ''; ?>" onclick="openTab(event, 'tab-foto')"><i class="fas fa-image"></i> FOTO</button>
-                <button class="tab-btn <?php echo ($current_tab == 'video') ? 'active' : ''; ?>" onclick="openTab(event, 'tab-video')"><i class="fas fa-video"></i> VIDEO</button>
-            </div>
-
+        <div class="file-list">
             <?php
-            $all_files = array_diff(scandir($upload_dir), array('.', '..'));
-            arsort($all_files);
-
-            function renderTabContent($files, $allowed_exts, $type_label, $tab_id, $btn_color, $upload_dir) {
-                $filtered = array_filter($files, function($f) use ($allowed_exts) {
-                    return in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), $allowed_exts);
-                });
-                ?>
-                <div class="upload-box">
-                    <form action="" method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="active_tab" value="<?php echo $tab_id; ?>">
-                        <input type="file" name="tugas_file" accept="<?php echo ($type_label == 'PDF' ? '.pdf' : ($type_label == 'FOTO' ? 'image/*' : 'video/*')); ?>" required>
-                        <button type="submit" class="btn-upload" style="background:<?php echo $btn_color; ?>">Upload <?php echo $type_label; ?></button>
-                    </form>
-                </div>
-
-                <div class="file-list">
-                    <?php if (empty($filtered)): ?>
-                        <div style="padding:40px; color:#94a3b8; font-size:14px;">Belum ada file <?php echo $type_label; ?>.</div>
-                    <?php else: ?>
-                        <?php foreach ($filtered as $file): 
-                            $path = $upload_dir . $file;
-                            $size = round(filesize($path) / (1024 * 1024), 2);
-                            $display_name = substr($file, strpos($file, '_') + 1);
-                        ?>
-                            <div class="file-item">
-                                <div class="file-info">
-                                    <span class="file-name"><?php echo $display_name; ?></span>
-                                    <span class="file-meta"><?php echo $size; ?> MB</span>
-                                </div>
-                                <div style="display:flex; gap:15px">
-                                    <a href="?page=view&file=<?php echo $file; ?>&tab=<?php echo $tab_id; ?>" style="color:var(--primary); text-decoration:none; font-weight:600; font-size:14px;"><i class="fas fa-eye"></i> Lihat</a>
-                                    <a href="#" onclick="konfirmasiHapus('<?php echo $path; ?>', '<?php echo $tab_id; ?>')" style="color:var(--danger);"><i class="fas fa-trash"></i></a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-                <?php
-            }
+            $files = array_diff(scandir($uploadDir), array('.', '..'));
+            if (empty($files)) echo "<p style='color:#ccc; text-align:center;'>Belum ada file.</p>";
+            foreach ($files as $f) :
             ?>
+                <div class="file-item">
+                    <span class="file-name"><i class="far fa-file-alt"></i> <?php echo $f; ?></span>
+                    <div class="actions">
+                        <a href="?page=view&file=<?php echo urlencode($f); ?>"><i class="fas fa-eye"></i> Lihat</a>
+                        <a href="?hapus=<?php echo urlencode($f); ?>" onclick="return confirm('Hapus file ini?')"><i class="fas fa-trash-alt"></i> Hapus</a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
 
-            <div id="tab-pdf" class="tab-content <?php echo ($current_tab == 'pdf') ? 'active' : ''; ?>">
-                <?php renderTabContent($all_files, ['pdf'], 'PDF', 'pdf', '#2563eb', $upload_dir); ?>
-            </div>
-            <div id="tab-foto" class="tab-content <?php echo ($current_tab == 'foto') ? 'active' : ''; ?>">
-                <?php renderTabContent($all_files, ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'FOTO', 'foto', '#059669', $upload_dir); ?>
-            </div>
-            <div id="tab-video" class="tab-content <?php echo ($current_tab == 'video') ? 'active' : ''; ?>">
-                <?php renderTabContent($all_files, ['mp4', 'webm', 'ogg', 'mov'], 'VIDEO', 'video', '#7c3aed', $upload_dir); ?>
-            </div>
+        <div class="upload-area">
+            <form action="" method="POST" enctype="multipart/form-data">
+                <input type="file" name="tugas" required>
+                <button type="submit" class="btn-upload">
+                    <i class="fas fa-cloud-upload-alt"></i> UPLOAD SEKARANG
+                </button>
+            </form>
+            <p style="font-size: 10px; color: #999; margin-top: 10px;">Max size: 600MB (PDF, Foto, Video)</p>
         </div>
-    <?php elseif ($_GET['page'] == 'view'): ?>
-        <div class="container" style="max-width: 900px; padding: 1rem; margin-top: 10px;"> 
-            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1.2rem;">Pratinjau File</h3>
-            
-            <div class="preview-wrapper" style="width: 100%; height: 70vh; background: #fcfcfcff; border-radius: 10px; overflow: hidden; display: flex; justify-content: center; align-items: center;">
-                <?php
-                $file = $_GET['file']; $path = $upload_dir . $file;
-                $prev_tab = isset($_GET['tab']) ? $_GET['tab'] : 'pdf';
-                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                
-                if ($ext == 'pdf') {
-                    echo "<iframe src='$path' style='width:100%; height:100%; border:none; background:white;'></iframe>";
-                } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                    echo "<img src='$path' style='max-width:100%; max-height:100%; object-fit: contain;'>";
-                } elseif (in_array($ext, ['mp4', 'webm', 'ogg', 'mov'])) {
-                    echo "<video controls playsinline style='max-width:100%; max-height:100%;'><source src='$path' type='video/$ext'></video>";
-                }
-                ?>
-            </div>
-            
-            <div style="display:flex; justify-content: center; gap:40px; margin-top:15px;">
-                <a href="?page=upload&tab=<?php echo $prev_tab; ?>" style="text-decoration:none; color:var(--gray); font-weight:600; font-size: 14px;"><i class="fas fa-arrow-left"></i> Kembali</a>
-                <a href="<?php echo $path; ?>" download style="text-decoration:none; color:var(--primary); font-weight:600; font-size: 14px;"><i class="fas fa-download"></i> Unduh</a>
-            </div>
+    </div>
+
+    <?php elseif ($page == 'view'): 
+        $fileView = $_GET['file'];
+        $pathView = $uploadDir . $fileView;
+    ?>
+    <div class="card">
+        <div style="text-align: left; margin-bottom: 20px;">
+            <a href="?page=dashboard" class="btn-link" style="margin-right: 20px;">
+                <i class="fas fa-chevron-left"></i> Kembali
+            </a>
+            <a href="<?php echo $pathView; ?>" download class="btn-link" style="color: #2ecc71;">
+                <i class="fas fa-download"></i> Unduh
+            </a>
         </div>
+
+        <div class="preview-box">
+            <p style="margin-bottom: 15px; font-weight: bold;"><?php echo $fileView; ?></p>
+            <?php
+            $ext = strtolower(pathinfo($fileView, PATHINFO_EXTENSION));
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                <img src="<?php echo $pathView; ?>" class="preview-content">
+            <?php elseif ($ext == 'pdf'): ?>
+                <iframe src="<?php echo $pathView; ?>" width="100%" height="400px" style="border:none;"></iframe>
+            <?php elseif (in_array($ext, ['mp4', 'webm'])): ?>
+                <video controls class="preview-content">
+                    <source src="<?php echo $pathView; ?>" type="video/mp4">
+                </video>
+            <?php else: ?>
+                <p>Preview tidak tersedia untuk tipe file ini.</p>
+            <?php endif; ?>
+        </div>
+    </div>
     <?php endif; ?>
 
     <script>
-        function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) { tabcontent[i].classList.remove("active"); }
-            tablinks = document.getElementsByClassName("tab-btn");
-            for (i = 0; i < tablinks.length; i++) { tablinks[i].classList.remove("active"); }
-            document.getElementById(tabName).classList.add("active");
-            evt.currentTarget.classList.add("active");
-        }
-
-        function startLoading() {
-            const barContainer = document.getElementById('progress-bar-container');
-            const bar = document.getElementById('progress-bar');
-            barContainer.style.display = 'block';
-            let width = 0;
-            const interval = setInterval(() => {
-                if (width >= 100) { clearInterval(interval); window.location.href = "?page=upload"; }
-                else { width += 1; bar.style.width = width + '%'; }
-            }, 20); 
-        }
-
-        function konfirmasiHapus(path, tab) {
-            if (confirm("Hapus file ini?")) { window.location.href = "?delete=" + path + "&tab=" + tab; }
+        // --- JAVASCRIPT LOGIC ---
+        function goToDashboard() {
+            // Tampilkan loading
+            document.getElementById('loader').style.display = 'flex';
+            
+            // Delay 1 detik
+            setTimeout(function() {
+                window.location.href = "?page=dashboard";
+            }, 1000);
         }
     </script>
 </body>
